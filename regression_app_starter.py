@@ -74,6 +74,12 @@ def polynomial_features(X, degree):
     X_poly = np.hstack([X ** i for i in range(1, degree + 1)])
     return X_poly
 
+def standardize_features(X):
+    mean = np.mean(X, axis=0)
+    std = np.std(X, axis=0)
+    std[std == 0] = 1  # prevent division by zero
+    return (X - mean) / std
+
 
 # ==========================================
 # LINEAR REGRESSION CLASS
@@ -579,6 +585,7 @@ def main():
     # Feature engineering
     if degree > 1:
         X_model = polynomial_features(X, degree)
+        X_model = standardize_features(X_model)
     else:
         X_model = X
 
