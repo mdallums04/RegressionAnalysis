@@ -411,7 +411,10 @@ def animate_gradient_descent(X, y, model):
     fig = go.Figure()
 
     for i in range(0, len(model.weight_history), 10):
-        y_line = X @ model.weight_history[i] + model.bias_history[i]
+        w = model.weight_history[i][0]
+        b = model.bias_history[i]
+        y_line = w * X.flatten() + b
+
         fig.add_trace(
             go.Scatter(
                 x=X.flatten(),
@@ -609,6 +612,10 @@ def main():
                 model.bias = bias
                 model.losses = []
 
+            if np.isnan(y_pred).any():
+                st.error("Model produced invalid predictions. Check configuration.")
+                return
+
             metrics = compute_metrics(y, y_pred)
 
             st.session_state.model = model
@@ -742,8 +749,14 @@ def main():
             """)
 
     with tab5:
-        fig_anim = animate_gradient_descent(X_model, y, model)
-        st.plotly_chart(fig_anim)
+        if algorithm == "Gradient Descent" and degree == 1:
+            fig_anim = animate_gradient_descent(X, y, model)
+            st.plotly_chart(fig_anim)
+        else:
+            st.info(
+                "Gradient descent animation is available only for "
+                "linear regression (polynomial degree = 1)."
+            )
 
     st.divider()
 
