@@ -60,6 +60,20 @@ def generate_synthetic_data(n_samples, noise_level, data_type, random_seed):
 
     return X, y, y_true
 
+def polynomial_features(X, degree):
+    """
+    Expand input features into polynomial features.
+
+    Args:
+        X: Original feature matrix (n_samples, 1)
+        degree: Polynomial degree
+
+    Returns:
+        X_poly: Expanded feature matrix (n_samples, degree)
+    """
+    X_poly = np.hstack([X ** i for i in range(1, degree + 1)])
+    return X_poly
+
 
 # ==========================================
 # LINEAR REGRESSION CLASS
@@ -76,7 +90,7 @@ class LinearRegression:
     Loss: MSE = (1/n) * sum((y - y_pred)^2)
     """
 
-    def __init__(self, learning_rate=0.01, n_iterations=1000):
+    def __init__(self, learning_rate=0.01, n_iterations=1000, lambda_reg=0.0):
         """
         Initialize the model.
 
@@ -86,6 +100,7 @@ class LinearRegression:
         """
         self.learning_rate = learning_rate
         self.n_iterations = n_iterations
+        self.lambda_reg = lambda_reg
         self.weights = None
         self.bias = None
         self.losses = []  # Track loss over iterations
@@ -110,6 +125,9 @@ class LinearRegression:
         self.weights = np.random.randn(n_features)  # REPLACE THIS
         self.bias = 0.0     # REPLACE THIS
 
+        self.weight_history = []
+        self.bias_history = []
+
         # ==========================================
         # Training loop
         # ==========================================
@@ -129,7 +147,7 @@ class LinearRegression:
             # MSE = (1/n) * sum((y - y_pred)^2)
             # Hint: Use np.mean() and ** 2
 
-            loss = np.mean((y - y_pred) ** 2)  # REPLACE THIS
+            loss = np.mean((y - y_pred) ** 2) + self.lambda_reg * np.sum(self.weights ** 2) # REPLACE THIS
 
             # Store loss for visualization
             self.losses.append(loss)
@@ -140,8 +158,7 @@ class LinearRegression:
             # Gradient for weights: dw = -(2/n) * X.T @ (y - y_pred)
             # Gradient for bias: db = -(2/n) * sum(y - y_pred)
             # Hint: Remember to transpose X for dw calculation
-
-            dw = -(2 / n_samples) * X.T @ (y - y_pred)  # REPLACE THIS
+            dw = -(2 / n_samples) * X.T @ (y - y_pred) + 2 * self.lambda_reg * self.weights
             db = -(2 / n_samples) * np.sum(y - y_pred)  # REPLACE THIS
 
 
@@ -155,6 +172,8 @@ class LinearRegression:
             self.weights -= self.learning_rate * dw
             self.bias -= self.learning_rate * db
 
+            self.weight_history.append(self.weights.copy())
+            self.bias_history.append(self.bias)
 
             # Optional: Print progress every 100 iterations
             if iteration % 100 == 0:
@@ -177,6 +196,14 @@ class LinearRegression:
 
         y_pred = X @ self.weights + self.bias  # REPLACE THIS
         return y_pred
+
+def normal_equation(X, y):
+    """
+    Closed-form solution for linear regression.
+    """
+    X_b = np.hstack([np.ones((X.shape[0], 1)), X])
+    theta = np.linalg.inv(X_b.T @ X_b) @ X_b.T @ y
+    return theta
 
 
 # ==========================================
@@ -380,6 +407,24 @@ def plot_residuals(y_true, y_pred):
 
     return fig
 
+def animate_gradient_descent(X, y, model):
+    fig = go.Figure()
+
+    for i in range(0, len(model.weight_history), 10):
+        y_line = X @ model.weight_history[i] + model.bias_history[i]
+        fig.add_trace(
+            go.Scatter(
+                x=X.flatten(),
+                y=y_line,
+                mode='lines',
+                visible=False
+            )
+        )
+
+    fig.data[0].visible = True
+
+    return fig
+
 
 # ==========================================
 # STREAMLIT APP
@@ -481,6 +526,28 @@ def main():
         help="Number of training iterations"
     )
 
+    degree = st.sidebar.slider(
+        "Polynomial Degree",
+        min_value=1,
+        max_value=5,
+        value=1,
+        help="Degree=1 is linear regression"
+    )
+
+    lambda_reg = st.sidebar.slider(
+        "L2 Regularization (λ)",
+        min_value=0.0,
+        max_value=1.0,
+        value=0.0,
+        step=0.01,
+        help="0 = no regularization (standard regression)"
+    )
+
+    algorithm = st.sidebar.selectbox(
+        "Training Algorithm",
+        ["Gradient Descent", "Normal Equation"]
+    )
+
     # ==========================================
     # MAIN CONTENT
     # ==========================================
@@ -506,27 +573,44 @@ def main():
 
     st.divider()
 
+    # Feature engineering
+    if degree > 1:
+        X_model = polynomial_features(X, degree)
+    else:
+        X_model = X
+
     # Train model button
     if st.button("🚀 Train Model", type="primary"):
 
         with st.spinner("Training model... This may take a moment."):
 
-            # Create and train model
-            model = LinearRegression(
-                learning_rate=learning_rate,
-                n_iterations=n_iterations
-            )
+            if algorithm == "Gradient Descent":
+                model = LinearRegression(
+                    learning_rate=learning_rate,
+                    n_iterations=n_iterations,
+                    lambda_reg=lambda_reg
+                )
 
-            # Train the model
-            model.fit(X, y)
+                model.fit(X_model, y)
+                y_pred = model.predict(X_model)
 
-            # Make predictions
-            y_pred = model.predict(X)
+            else:  # Normal Equation
+                theta = normal_equation(X_model, y)
 
-            # Compute metrics
+                # Split theta into bias and weights for consistency
+                bias = theta[0]
+                weights = theta[1:]
+
+                y_pred = X_model @ weights + bias
+
+                # Create a lightweight model-like object for UI compatibility
+                model = type("Model", (), {})()
+                model.weights = weights
+                model.bias = bias
+                model.losses = []
+
             metrics = compute_metrics(y, y_pred)
 
-            # Store in session state
             st.session_state.model = model
             st.session_state.y_pred = y_pred
             st.session_state.metrics = metrics
@@ -548,11 +632,12 @@ def main():
     # RESULTS TABS
     # ==========================================
 
-    tab1, tab2, tab3, tab4 = st.tabs([
+    tab1, tab2, tab3, tab4, tab5 = st.tabs([
         "📊 Training Progress",
         "📈 Predictions",
         "📉 Residuals",
-        "📋 Metrics"
+        "📋 Metrics",
+        "🎞️ Gradient Descent Animation"
     ])
 
     # Tab 1: Training Progress
@@ -655,6 +740,10 @@ def main():
             - 0.0 = predictions no better than the mean
             - Can be negative if model is very poor
             """)
+
+    with tab5:
+        fig_anim = animate_gradient_descent(X_model, y, model)
+        st.plotly_chart(fig_anim)
 
     st.divider()
 
