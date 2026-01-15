@@ -764,13 +764,18 @@ def main():
             """)
 
     with tab5:
-        if algorithm == "Gradient Descent" and degree == 1:
+        if (
+                algorithm == "Gradient Descent"
+                and degree == 1
+                and hasattr(model, "weight_history")
+                and model.weight_history
+        ):
             fig_anim = animate_gradient_descent(X, y, model)
             st.plotly_chart(fig_anim)
         else:
             st.info(
-                "Gradient descent animation is available only for "
-                "linear regression (polynomial degree = 1)."
+                "Gradient descent animation is available only after training "
+                "a linear model using Gradient Descent."
             )
 
     st.divider()
