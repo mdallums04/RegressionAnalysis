@@ -657,18 +657,26 @@ def main():
     # Tab 1: Training Progress
     with tab1:
         st.subheader("Training Progress")
-        st.markdown("Loss should decrease over iterations, showing convergence.")
 
-        # Plot training progress
-        fig_progress = plot_training_progress(model.losses)
-        st.plotly_chart(fig_progress, width="stretch")
+        if algorithm == "Gradient Descent" and model.losses:
+            st.markdown("Loss should decrease over iterations, showing convergence.")
 
-        # Show final loss
-        col1, col2 = st.columns(2)
-        with col1:
-            st.metric("Initial Loss", f"{model.losses[0]:.4f}")
-        with col2:
-            st.metric("Final Loss", f"{model.losses[-1]:.4f}")
+            # Plot training progress
+            fig_progress = plot_training_progress(model.losses)
+            st.plotly_chart(fig_progress, width="stretch")
+
+            # Show initial and final loss
+            col1, col2 = st.columns(2)
+            with col1:
+                st.metric("Initial Loss", f"{model.losses[0]:.4f}")
+            with col2:
+                st.metric("Final Loss", f"{model.losses[-1]:.4f}")
+
+        else:
+            st.info(
+                "Training progress is only available for Gradient Descent. "
+                "The Normal Equation computes the solution in a single step."
+            )
 
     # Tab 2: Predictions
     with tab2:
