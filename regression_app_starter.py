@@ -413,26 +413,96 @@ def plot_residuals(y_true, y_pred):
 
     return fig
 
-def animate_gradient_descent(X, y, model):
-    fig = go.Figure()
+def animate_gradient_descent(X, y, model, step=10):
+    """
+    Animate gradient descent convergence for linear regression.
+    Only valid for degree = 1.
+    """
 
-    for i in range(0, len(model.weight_history), 10):
+    X_flat = X.flatten()
+
+    # Base scatter plot (data points)
+    fig = go.Figure(
+        data=[
+            go.Scatter(
+                x=X_flat,
+                y=y,
+                mode="markers",
+                name="Data"
+            ),
+            go.Scatter(
+                x=X_flat,
+                y=model.weight_history[0][0] * X_flat + model.bias_history[0],
+                mode="lines",
+                name="Model"
+            )
+        ],
+        layout=go.Layout(
+            title="Gradient Descent Convergence",
+            xaxis=dict(title="X"),
+            yaxis=dict(title="y"),
+            updatemenus=[
+                {
+                    "type": "buttons",
+                    "showactive": False,
+                    "buttons": [
+                        {
+                            "label": "▶ Play",
+                            "method": "animate",
+                            "args": [
+                                None,
+                                {
+                                    "frame": {"duration": 50, "redraw": True},
+                                    "fromcurrent": True
+                                }
+                            ]
+                        }
+                    ]
+                }
+            ],
+            sliders=[
+                {
+                    "steps": [],
+                    "currentvalue": {"prefix": "Iteration: "}
+                }
+            ]
+        )
+    )
+
+    # Create frames
+    frames = []
+    slider_steps = []
+
+    for i in range(0, len(model.weight_history), step):
         w = model.weight_history[i][0]
         b = model.bias_history[i]
-        y_line = w * X.flatten() + b
 
-        fig.add_trace(
-            go.Scatter(
-                x=X.flatten(),
-                y=y_line,
-                mode='lines',
-                visible=False
-            )
+        frame = go.Frame(
+            data=[
+                go.Scatter(
+                    x=X_flat,
+                    y=w * X_flat + b,
+                    mode="lines"
+                )
+            ],
+            name=str(i)
         )
 
-    fig.data[0].visible = True
+        frames.append(frame)
+
+        slider_steps.append(
+            {
+                "method": "animate",
+                "label": str(i),
+                "args": [[str(i)], {"mode": "immediate"}]
+            }
+        )
+
+    fig.frames = frames
+    fig.layout.sliders[0]["steps"] = slider_steps
 
     return fig
+
 
 
 # ==========================================
